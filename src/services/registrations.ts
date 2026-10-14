@@ -11,6 +11,7 @@ import { validateSelfRegistration } from "../validation/self-registration.js";
 import { insertGuest, type GuestOwner } from "./guests.js";
 import { ensureInvitation } from "./invitations.js";
 import { recordAcceptance, resolveAcceptance } from "./legal.js";
+import { sendGoodPracticesEmail } from "./mailer.js";
 import { claimPhotos, storagePath } from "./photos.js";
 import { fail, ok, type ApiResult, type RequestContext } from "./result.js";
 import { refuse, transactional } from "./transaction.js";
@@ -100,6 +101,7 @@ export async function selfRegister(raw: unknown, ctx: RequestContext): Promise<A
   if (new Set(documentHashes).size !== documentHashes.length) return fail("Este documento já está cadastrado neste convite.");
 
   const staleFiles: string[] = [];
+  const hostEmail = text(request.contato?.email?.email);
 
   const result = await transactional(async (conn) => {
     const invitation = await ensureInvitation(conn, token, true);
@@ -162,6 +164,11 @@ export async function selfRegister(raw: unknown, ctx: RequestContext): Promise<A
   // Só depois do commit: se a transação falhasse, as fotos antigas continuariam valendo.
   if (result.body.RES === true) {
     await Promise.all(staleFiles.map((file) => rm(path.join(storagePath, file), { force: true })));
+  }
+
+  // Só quando houve link de autocadastro de convidados; sem await, para não atrasar a resposta nem depender do SMTP.
+  if (result.body.RES === true && result.body.GUEST_SELF_REGISTRY && hostEmail) {
+    void sendGoodPracticesEmail(hostEmail);
   }
 
   return result;

@@ -1,7 +1,8 @@
 import type { GuestPayload } from "../contract/api-contract.js";
-import { collectPhoto, formatPhone, isObject, text } from "./common.js";
+import { ageFromIsoDate, collectPhoto, formatPhone, isObject, isValidCpf, isValidEmail, isValidPassport, text } from "./common.js";
 
-const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+/** Maioridade: quem tem documento ou é maior não entra como "menor sem documento". */
+const ADULT_AGE = 18;
 
 /**
  * Primeira inconsistência de um convidado (mensagem em português), ou null. As fotos referenciadas vão para `photoIds`.
@@ -16,7 +17,7 @@ export function validateGuestPayload(guest: GuestPayload, label: string, photoRe
 
   if (!name || !lastName) return `${label}: nome incompleto.`;
   if (name.length > 80 || lastName.length > 80) return `${label}: nome muito longo.`;
-  if (!email.includes("@") || email.length > 160) return `${label}: e-mail inválido.`;
+  if (!isValidEmail(email)) return `${label}: e-mail inválido.`;
   if (!isObject(guest.telefone) || !text(guest.telefone.numero)) return `${label}: telefone não informado.`;
   if (formatPhone(guest.telefone).length > 40) return `${label}: telefone inválido.`;
 
@@ -24,13 +25,22 @@ export function validateGuestPayload(guest: GuestPayload, label: string, photoRe
   const hasBirthDate = typeof guest.data_nascimento === "string" && guest.data_nascimento !== "";
 
   if (hasDocument === hasBirthDate) return `${label}: informe o documento OU a data de nascimento.`;
-  if (hasDocument && text(guest.documento).length > 40) return `${label}: documento inválido.`;
+
+  if (hasDocument) {
+    // Só números (11) é CPF e precisa de dígito verificador válido; o resto é passaporte (letras e números).
+    const document = text(guest.documento).replace(/[.\-\s]/g, "");
+    const valid = /^\d+$/.test(document) ? isValidCpf(document) : isValidPassport(document);
+
+    if (!valid) return `${label}: documento inválido.`;
+    if (guest.menor_sem_documento) return `${label}: menor sem documento não pode ter documento.`;
+  }
 
   if (hasBirthDate) {
-    if (!ISO_DATE.test(String(guest.data_nascimento)) || Number.isNaN(Date.parse(String(guest.data_nascimento)))) {
-      return `${label}: data de nascimento inválida.`;
-    }
+    const age = ageFromIsoDate(String(guest.data_nascimento));
+
+    if (age === null) return `${label}: data de nascimento inválida.`;
     if (!guest.menor_sem_documento) return `${label}: menor sem documento precisa da confirmação.`;
+    if (age >= ADULT_AGE) return `${label}: maior de idade precisa informar o documento.`;
   }
 
   if (guest.foto || photoRequired) return collectPhoto(guest.foto, `foto do ${label.toLowerCase()}`, photoIds);

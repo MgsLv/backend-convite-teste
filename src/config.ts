@@ -16,6 +16,13 @@ const schema = z.object({
   FRONT_ORIGIN: z.string().url(),
   STORAGE_DIR: z.string().min(1),
   TEST_HOOKS: z.enum(["true", "false"]).default("false"),
+  // Conta de email própria usada no envio (opcional: sem EMAIL_USER/EMAIL_PASSWORD o email é ignorado e o cadastro segue normal).
+  EMAIL_HOST: z.string().optional(),
+  EMAIL_PORT: z.coerce.number().int().min(1).max(65535).default(465),
+  EMAIL_SECURE: z.enum(["true", "false"]).default("true"),
+  EMAIL_USER: z.string().optional(),
+  EMAIL_PASSWORD: z.string().optional(),
+  EMAIL_FROM_NAME: z.string().default("Equipe Kimovil"),
 });
 
 const parsed = schema.safeParse(process.env);
@@ -48,4 +55,12 @@ export const config = {
   storageDir: env.STORAGE_DIR,
   // hooks de teste nunca ligam em produção
   testHooks: env.TEST_HOOKS === "true" && env.NODE_ENV !== "production",
+  mail: {
+    host: env.EMAIL_HOST || null,
+    port: env.EMAIL_PORT,
+    secure: env.EMAIL_SECURE === "true",
+    user: env.EMAIL_USER || null,
+    password: env.EMAIL_PASSWORD || null,
+    fromName: env.EMAIL_FROM_NAME,
+  },
 } as const;

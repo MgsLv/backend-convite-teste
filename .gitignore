@@ -39,6 +39,9 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
+# Local Storage
+/storage
+
 # Claude/Livotask
 CLAUDE.md
 .mcp.json

@@ -1,5 +1,5 @@
 import { API_REQUESTS, CATEGORY_IDS, type ApiCategory, type PhotoRef, type SelfRegistrationRequest } from "../contract/api-contract.js";
-import { collectPhoto, isObject, text } from "./common.js";
+import { collectPhoto, isObject, isValidCpf, isValidEmail, isValidPassport, text } from "./common.js";
 import { validateGuestPayload } from "./guests.js";
 
 const categoryById = (id: string) =>
@@ -29,9 +29,10 @@ export function validateSelfRegistration(raw: unknown, invitation: string): Self
 
   const documento = pessoa?.documento;
   if (documento?.estrangeiro === false) {
-    if (!/^\d{11}$/.test(text(documento.cpf))) return { error: "CPF inválido." };
+    if (!isValidCpf(text(documento.cpf))) return { error: "CPF inválido." };
   } else if (documento?.estrangeiro === true) {
     if (!text(documento.passaporte)) return { error: "Passaporte não informado." };
+    if (!isValidPassport(text(documento.passaporte))) return { error: "Passaporte inválido." };
   } else {
     return { error: "Documento inválido." };
   }
@@ -40,7 +41,7 @@ export function validateSelfRegistration(raw: unknown, invitation: string): Self
   if (photoError) return { error: photoError };
 
   const contato = body.contato;
-  if (!text(contato?.email?.email).includes("@")) return { error: "E-mail inválido." };
+  if (!isValidEmail(text(contato?.email?.email))) return { error: "E-mail inválido." };
   if (!text(contato?.telefone?.numero)) return { error: "Telefone não informado." };
 
   if (category === "Fornecedor" && !text(pessoa.profissao?.descricao)) return { error: "Profissão não informada." };

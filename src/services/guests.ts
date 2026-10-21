@@ -1,13 +1,12 @@
 import type { ResultSetHeader, RowDataPacket } from "mysql2/promise";
-import { API_REQUESTS, type GuestPayload, type LegalAcceptance } from "../contract/api-contract.js";
+import { API_REQUESTS, type GuestPayload } from "../contract/api-contract.js";
 import { pool, type Db } from "../db/pool.js";
 import { hashDocument, sha256 } from "../security.js";
 import { seedGuestInviteUses, shouldFailRegistration } from "../test-hooks.js";
 import { formatPhone, isObject, text } from "../validation/common.js";
 import { validateGuestSelfRegistration } from "../validation/guests.js";
-import { recordAcceptance, resolveAcceptance } from "./legal.js";
 import { claimPhotos } from "./photos.js";
-import { fail, ok, type ApiResult, type RequestContext } from "./result.js";
+import { fail, ok, type ApiResult } from "./result.js";
 import { refuse, transactional } from "./transaction.js";
 
 interface GuestInviteRow extends RowDataPacket {
@@ -108,17 +107,14 @@ export async function checkGuestInvitation(token: string, request: string): Prom
   return ok({ TOKEN: token, USOS_DISPONIVEIS: Math.max(invite.total_uses - invite.used_uses, 0) });
 }
 
-/** POST /convidado: grava o convidado, o aceite e desconta um uso, na mesma transação. */
-export async function registerGuest(raw: unknown, ctx: RequestContext): Promise<ApiResult> {
+/** POST /convidado: grava o convidado e desconta um uso, na mesma transação. */
+export async function registerGuest(raw: unknown): Promise<ApiResult> {
   if (!isObject(raw)) return fail("Corpo inválido.", 400);
 
   const token = isObject(raw.convite) ? text(raw.convite.id) : "";
 
   if (raw.request !== API_REQUESTS.guestRegistration) return fail("Requisição inválida.");
   if (!token) return fail("Convite não informado.", 400);
-
-  const acceptance = await resolveAcceptance(raw.aceite as LegalAcceptance | null | undefined);
-  if (acceptance && "error" in acceptance) return fail(acceptance.error);
 
   return transactional(async (conn) => {
     // A trava na linha do link faz dois convidados disputando o último uso serem atendidos um de cada vez.
@@ -147,12 +143,8 @@ export async function registerGuest(raw: unknown, ctx: RequestContext): Promise<
       if (duplicates.length > 0) refuse("Este documento já está cadastrado neste convite.");
     }
 
-    const guestId = await insertGuest(conn, owner, "autocadastro", guest);
+    await insertGuest(conn, owner, "autocadastro", guest);
     await conn.query("UPDATE guest_invites SET used_uses = used_uses + 1 WHERE id = ?", [invite.id]);
-
-    if (acceptance) {
-      await recordAcceptance(conn, acceptance, ctx, { invitationId: owner.invitationId, guestId, context: "convidado" });
-    }
 
     return ok({ MSG: "Cadastro realizado com sucesso." });
   });

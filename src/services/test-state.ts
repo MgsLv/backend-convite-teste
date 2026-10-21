@@ -40,7 +40,7 @@ export async function resetState() {
 
   await withTransaction(async (conn) => {
     // ordem das chaves estrangeiras: dependentes primeiro
-    for (const table of ["legal_acceptances", "guests", "photos", "guest_invites", "registrations", "invitations"]) {
+    for (const table of ["guests", "photos", "guest_invites", "registrations", "invitations"]) {
       await conn.query(`DELETE FROM ${table}`);
     }
   });

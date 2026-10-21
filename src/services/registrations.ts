@@ -10,10 +10,9 @@ import { isObject, text } from "../validation/common.js";
 import { validateSelfRegistration } from "../validation/self-registration.js";
 import { insertGuest, type GuestOwner } from "./guests.js";
 import { ensureInvitation } from "./invitations.js";
-import { recordAcceptance, resolveAcceptance } from "./legal.js";
 import { sendGoodPracticesEmail } from "./mailer.js";
 import { claimPhotos, storagePath } from "./photos.js";
-import { fail, ok, type ApiResult, type RequestContext } from "./result.js";
+import { fail, ok, type ApiResult } from "./result.js";
 import { refuse, transactional } from "./transaction.js";
 
 interface ExistingRegistration extends RowDataPacket {
@@ -70,12 +69,12 @@ function keepStoredDocument(request: SelfRegistrationRequest, stored: unknown): 
 }
 
 /**
- * POST /autocadastro: grava cadastro, convidados, link de autocadastro e aceite numa transação só.
+ * POST /autocadastro: grava cadastro, convidados e link de autocadastro numa transação só.
  * O convite principal é de uso contínuo: continua válido depois do cadastro (até ser expirado, ver `pnpm invite:expire`)
  * e várias pessoas se cadastram pelo mesmo token. Se o documento do responsável já está cadastrado (em qualquer
  * convite), o cadastro existente é atualizado com este envio, inclusive as fotos; o documento permanece o mesmo.
  */
-export async function selfRegister(raw: unknown, ctx: RequestContext): Promise<ApiResult> {
+export async function selfRegister(raw: unknown): Promise<ApiResult> {
   const token = isObject(raw) && isObject(raw.convite) ? text(raw.convite.id) : "";
 
   if (!token) return fail("Convite não informado.", 400);
@@ -85,9 +84,6 @@ export async function selfRegister(raw: unknown, ctx: RequestContext): Promise<A
   if ("error" in validated) return fail(validated.error);
 
   const { category, photoIds, request } = validated;
-
-  const acceptance = await resolveAcceptance(request.aceite);
-  if (acceptance && "error" in acceptance) return fail(acceptance.error);
 
   // Convidados e link de autocadastro só existem para o hóspede.
   const isGuest = category === "Hospede";
@@ -149,10 +145,6 @@ export async function selfRegister(raw: unknown, ctx: RequestContext): Promise<A
         owner.registrationId,
         selfSlots,
       ]);
-    }
-
-    if (acceptance) {
-      await recordAcceptance(conn, acceptance, ctx, { invitationId: owner.invitationId, guestId: null, context: "autocadastro" });
     }
 
     return ok({

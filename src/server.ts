@@ -13,7 +13,7 @@ import { stateRouter } from "./routes/state.js";
 const app = express();
 
 app.disable("x-powered-by");
-app.set("trust proxy", false);
+app.set("trust proxy", "loopback");
 app.use(helmet());
 app.use(
   cors({

@@ -33,17 +33,6 @@
  *        O backend localiza o responsável pelo token, grava o hóspede vinculado a ele e faz USOS_DISPONIVEIS - 1
  *        (as três coisas na mesma transação). Sem usos restantes: RES false, MSG "Convite expirado".
  *   O convidado preenche os mesmos campos do convidado cadastrado à mão pelo responsável (GuestPayload).
- *
- * ── Aceite do Aviso de Privacidade e dos Termos de Uso (campo `aceite`, ver LegalAcceptance) ──────────────────────
- * Vai no corpo do POST /autocadastro e do POST /convidado. Definição provisória, a fechar com o jurídico:
- *   - Opcional por enquanto (o front ainda não coleta o aceite). Quando coletar, o backend de produção deve recusar
- *     (RES false + MSG) o cadastro sem `aceite`.
- *   - A versão enviada é a que a tela mostrou ao usuário. O backend compara com a vigente e recusa se divergir,
- *     para nunca registrar o aceite de um texto que o usuário não viu.
- *   - Data/hora, IP e user-agent são registrados PELO SERVIDOR (nada disso vem do cliente, que pode mentir).
- *   - O aceite é gravado na mesma transação do cadastro (e do uso do link, no /convidado): ou grava tudo ou nada.
- *   - `declaracoes` diz quem está declarando o quê: "titular" (a própria pessoa), "responsavel_terceiro" (o responsável
- *     cadastrou convidados à mão e declara ter autorização) e "responsavel_legal" (há menor no cadastro).
  */
 
 /* ------------------------------------------------------------------ */
@@ -97,30 +86,6 @@ export interface ApiResponse {
   /** Mensagem para o usuário quando RES = false. */
   MSG?: string;
   INFO?: string;
-}
-
-/* ------------------------------------------------------------------ */
-/* Aceite dos documentos legais                                        */
-/* ------------------------------------------------------------------ */
-
-/** Quem faz cada declaração do aceite. Uma pessoa pode fazer mais de uma (ex.: responsável que cadastra um menor). */
-export const LEGAL_DECLARATIONS = {
-  /** A própria pessoa que se cadastra (responsável, convidado, corretor ou fornecedor). */
-  holder: "titular",
-  /** O responsável cadastrou convidados à mão e declara ter autorização para informar os dados deles. */
-  guestsAuthority: "responsavel_terceiro",
-  /** Pai, mãe ou responsável legal, quando o cadastro inclui um menor. */
-  guardian: "responsavel_legal",
-} as const;
-
-export type LegalDeclaration = (typeof LEGAL_DECLARATIONS)[keyof typeof LEGAL_DECLARATIONS];
-
-export interface LegalAcceptance {
-  /** Versão do Aviso de Privacidade exibida ao usuário no momento do aceite. */
-  aviso_privacidade: { versao: string };
-  /** Versão dos Termos de Uso exibida ao usuário no momento do aceite. */
-  termos_uso: { versao: string };
-  declaracoes: LegalDeclaration[];
 }
 
 /* ------------------------------------------------------------------ */
@@ -238,8 +203,6 @@ export interface SelfRegistrationRequest {
   convidados?: GuestPayload[];
   /** Só Hospede: quantos convidados poderão usar o link de autocadastro (0 a 10; convidados + isto ≤ 10). */
   quantidade_autocadastros?: number;
-  /** Aceite dos documentos legais (opcional por enquanto; ver "Aceite do Aviso de Privacidade" no topo). */
-  aceite?: LegalAcceptance;
 }
 
 export interface SelfRegistrationResponse extends ApiResponse {
@@ -264,8 +227,6 @@ export interface GuestRegistrationRequest {
   convite: { id: string };
   /** Foto obrigatória (KEY_FOTO do POST /foto); demais regras iguais às do convidado cadastrado à mão. */
   convidado: GuestPayload;
-  /** Aceite do próprio convidado (opcional por enquanto; ver "Aceite do Aviso de Privacidade" no topo). */
-  aceite?: LegalAcceptance;
 }
 
 export type GuestRegistrationResponse = ApiResponse;

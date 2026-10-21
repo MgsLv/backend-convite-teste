@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { checkGuestInvitation, registerGuest } from "../services/guests.js";
 import { delay } from "../test-hooks.js";
-import { bodyToken, lookupLimiter, queryText, requestContext, send } from "./http.js";
+import { bodyToken, lookupLimiter, queryText, send } from "./http.js";
 
 export const convidadoRouter: Router = Router();
 
@@ -14,5 +14,5 @@ convidadoRouter.get("/", lookupLimiter(), async (req, res) => {
 
 convidadoRouter.post("/", async (req, res) => {
   await delay(bodyToken(req.body));
-  send(res, await registerGuest(req.body, requestContext(req)));
+  send(res, await registerGuest(req.body));
 });
